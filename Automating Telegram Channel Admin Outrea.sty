@@ -1,0 +1,254 @@
+Automating Telegram Channel Admin Outreach
+Choosing a Library for Personal Account Automation
+To interact with Telegram using a personal account (not a bot), you need to use the MTProto API through client libraries. Popular choices include Telethon and Pyrogram in Python, or MadelineProto in PHP. These libraries function as full Telegram clients, allowing user logins and actions that bots can't do (e.g. listing group members or initiating direct chats)
+docs.pyrogram.org
+docs.pyrogram.org
+. For example, Pyrogram’s documentation notes that it can authorize user accounts and retrieve entire chat member lists, which the Bot API cannot
+docs.pyrogram.org
+docs.pyrogram.org
+. In practice:
+Telethon (Python) – A widely-used async library for MTProto. It’s feature-rich and has a large community of userbot developers. Telethon gives fine-grained control and up-to-date API access.
+Pyrogram (Python) – A high-level MTProto framework that is well-documented and user-friendly. Many find Pyrogram “more handy” to get started
+reddit.com
+, while still allowing personal account login.
+MadelineProto (PHP) – A robust PHP MTProto library if your project is in PHP. It similarly lets you log in with a phone number and act as a user.
+Other options – For Node.js, you could use GramJS. Telegram also offers an official C++ library (TDLib), but using Telethon/Pyrogram is far simpler for most needs.
+Why not use the Bot API? The official Bot API is limited: bots can’t initiate DMs to users who haven’t contacted them, and they can’t fetch channel member or admin lists unless added as an admin
+community.n8n.io
+. In contrast, a logged-in user account (via Telethon or similar) can join channels/groups and enumerate participants, which is essential for this task. In short, using an MTProto-based library with a personal account is the only viable route to message channel admins programmatically.
+Secure Authentication of a Personal Telegram Account
+Before coding, register as a Telegram developer to get your API ID and API Hash (from my.telegram.org under API Development). These credentials identify your client application. Keep them secret
+docs.telethon.dev
+docs.telethon.dev
+. With those in hand, you can authenticate a user:
+Initialize the Client: Create a Telegram client instance with Telethon or Pyrogram using your API ID/hash. For example, in Telethon:
+python
+Copy
+Edit
+from telethon import TelegramClient
+api_id = 123456
+api_hash = 'your_api_hash_here'
+client = TelegramClient('session_name', api_id, api_hash)
+Here 'session_name' is a name for the session file that will store your login info. Telethon will create a file (e.g. session_name.session) to remember your login, so you won't need to re-authenticate every run
+docs.telethon.dev
+.
+Log In with Phone Number: Start the client and log in. Telethon’s client.start() can prompt for the phone number and a code:
+python
+Copy
+Edit
+client.start(phone=lambda: input("Enter your phone number: "))
+On first run, Telegram sends a login code to your Telegram app or via SMS. Your code should handle entering this code (Telethon will prompt by default, or you can pass a code_callback function). After entering the code (and your 2FA password if enabled), the client obtains an authorization key for your account
+stackoverflow.com
+. This key is saved in the session file, so subsequent runs use the saved login and won’t require the code again
+docs.telethon.dev
+. (If you ever need to log out, use client.log_out() which will remove the session file.) Security tip: Do not hard-code your login code or password. Let the library prompt you, or use environment variables/input to supply sensitive info. Also, never expose your API hash in public code repositories
+docs.telethon.dev
+. Treat it like a password.
+Using Multiple Accounts: If you plan to use multiple Telegram accounts (to spread out messaging load), you need a session for each. You can reuse the same API ID/hash for multiple accounts – the API credentials identify your app, not a single user
+stackoverflow.com
+stackoverflow.com
+. For example, you might run TelegramClient('session2', api_id, api_hash) and log in with a second phone number. Each session file will be separate. Telegram allows multiple active sessions for one account, and using Telethon is akin to adding another device (like having Telegram on your phone and PC simultaneously)
+stackoverflow.com
+.
+Extracting Channel Admins and Owners Programmatically
+With an authenticated client, the next step is to get the admin list of each target channel. Telegram channels (or supergroups) with a public username can be accessed by any user account. The process for each channel on your list (t.me/channelname) is:
+Get the Channel Entity: Use the library to resolve the channel username to an internal entity object. In Telethon you can do:
+python
+Copy
+Edit
+channel = await client.get_entity("channelname")
+or synchronously client.get_entity("channelname") if using Telethon in sync mode. This returns an InputPeerChannel/Channel object with the channel’s ID and access hash, which is needed for API calls.
+Join the Channel if Needed: If the channel is actually a group chat (supergroup), you might need to join it to fetch members. Public groups can be joined via client(JoinChannelRequest(channel)). In many cases, simply calling get_entity on a public group will automatically join it or give access to member lists. For broadcast channels (one-way channels where only admins post), note that regular users cannot retrieve the full list of subscribers or admins unless they are themselves an admin. The Telegram API does not expose channel subscriber lists to non-admins
+stackoverflow.com
+. In those cases, you may not be able to get admins via API directly. A workaround is if the channel has a linked discussion group – you could then retrieve the admins of that group (since channel admins are often also the group admins). Otherwise, you might rely on info in the channel’s profile (sometimes channel creators list contact info in the description) or on admin signatures in posts. But assuming these are groups or you have access, proceed to fetch admins.
+Fetch Administrators: Use the API to get channel administrators. Telethon provides a convenient filter for this. For example:
+python
+Copy
+Edit
+from telethon.tl.types import ChannelParticipantsAdmins
+admins = []
+async for user in client.iter_participants(channel, filter=ChannelParticipantsAdmins):
+    admins.append(user)
+    print("Found admin:", user.username or user.first_name)
+This code iterates over all participants with admin roles
+arabic-telethon.readthedocs.io
+. It will include the channel owner/creator as well (the creator is considered an admin with full rights). By default, Telegram may exclude anonymous admins from this list
+core.telegram.org
+ – those admins who choose to appear as the channel itself (e.g. in groups where admins post anonymously, their identity isn’t revealed to members). Anonymous admins won’t be returned by the API for security, so be aware you might not get 100% of admins if some hide behind the channel name. Note: If you use Pyrogram, you can call get_chat_members(chat_id, filter="administrators") to get a list of admin members. The result will similarly include admins with their user information.
+Identify Owners (if needed): In most cases, messaging all admins is fine. If you specifically need the channel owner (original creator), note that Telegram doesn’t label the owner in the basic user list aside from them being an admin with possibly the highest privileges. In Telethon, you could distinguish the owner by using lower-level API calls: for instance, GetParticipantsRequest returns not just users but ChannelParticipant objects which might be of type ChannelParticipantCreator for the owner. However, this is usually unnecessary – the owner will be in the admins list, and you can send them a message just like any admin. If needed (for example, you only want to message the owner and not other admins), you could filter the admins list by checking which admin has the creator flag. In Telethon:
+python
+Copy
+Edit
+participants = await client.get_participants(channel, filter=ChannelParticipantsAdmins, aggressive=True)
+for p in participants:
+    if getattr(p, "participant", None).__class__.__name__ == "ChannelParticipantCreator":
+        owner = p
+This is a bit hacky; simply messaging all admins might be easier unless you have a reason to single out the creator.
+Now you should have a list of admin user IDs (or username handles) for each channel. The next step is to send them a direct message.
+Sending Direct Messages to Channel Admins
+Sending a DM with a personal account works like sending a message in the Telegram app – the user must not have blocked you or restricted who can message them. Here’s how to do it reliably and safely:
+Prepare the Message: Craft the content of your message. Make it personal if possible (e.g. include the admin’s name) to improve response rate and avoid looking like spam. You can use Markdown or HTML for formatting (Telethon’s default parse mode is Markdown
+arabic-telethon.readthedocs.io
+). For example:
+python
+Copy
+Edit
+message_text = "Hello {}! I found your channel and wanted to reach out...".format(admin.first_name)
+If using Telethon, it will interpret **bold**, __italic__, etc. by default. Ensure your message follows Telegram’s policies to avoid being reported.
+Send with Rate Limiting: Do not mass-send messages too quickly! Telegram will flag your account for spam if you initiate many chats in a short time. Empirical reports indicate that contacting more than ~20 users in quick succession triggers a PeerFlood error (Telegram’s way of saying “Too many requests, slow down”)
+stackoverflow.com
+. The safe approach is to send slowly and handle any rate-limit responses:
+Insert a delay between each message. For example, wait 10-30 seconds (randomized) after each DM. In one tutorial, a 30-second delay per message was used to avoid triggering limits
+python.gotrained.com
+.
+Use try/except to catch flood errors. Telethon and Pyrogram will throw FloodWaitError if Telegram explicitly tells you to wait. This error contains how many seconds to wait (e.g. 420 seconds). Your code should catch this and sleep for the required duration
+docs.pyrogram.org
+ before retrying. For example:
+python
+Copy
+Edit
+from telethon.errors import FloodWaitError
+try:
+    client.send_message(admin_id, message_text)
+except FloodWaitError as e:
+    print(f"Rate limit hit. Sleeping for {e.seconds} seconds...")
+    time.sleep(e.seconds)
+    # Then optionally retry sending or skip to next
+Also catch PeerFloodError. Unlike FloodWait, a PeerFloodError doesn’t tell you a wait time – it’s a general “too many actions” or spam warning. If you hit a PeerFloodError, stop sending immediately for that account. It means Telegram has flagged this pattern of activity. Continuing could result in your account being temporarily limited or banned from messaging
+python.gotrained.com
+. In practice, a PeerFlood may require waiting several hours or even days before the account can initiate new chats again. The best practice as shown in Telethon scripts is to abort on PeerFlood to protect the account
+python.gotrained.com
+.
+Handle privacy blocks. If an admin’s privacy settings disallow messages from non-contacts, Telethon will raise UserPrivacyRestrictedError. You should catch this and simply skip that admin – you cannot message them unless they add you or message you first. For example:
+python
+Copy
+Edit
+from telethon.errors import UserPrivacyRestrictedError, PeerFloodError
+try:
+    client.send_message(admin_id, message_text)
+except UserPrivacyRestrictedError:
+    print("Could not message {} due to their privacy settings.".format(admin_id))
+    continue  # move to next admin
+except PeerFloodError:
+    print("PeerFlood! Stopping to avoid ban.")
+    break  # stop messaging further
+If a user has blocked your account, you will get a different error (often ChatWriteForbiddenError). This is less common for cold outreach; it essentially means “you can’t write to this user,” so handle it similarly by skipping.
+Respect Daily Limits: In addition to spacing out messages, limit the total number of new chats you initiate per day. Telegram doesn’t publish exact numbers, but user experiences suggest keeping it to perhaps 50 or fewer new DMs per day per account to stay safe
+blackhatworld.com
+. One Stack Overflow answer noted that spreading ~19 messages over 30 minutes, then pausing, helped avoid triggers
+stackoverflow.com
+. Remember that limits can vary and may change, and new accounts are especially prone to strict limits. If you have a long list of admins to contact, consider using multiple accounts and spread the work among them
+stackoverflow.com
+ (e.g. 3 accounts sending 30 messages each, instead of 1 account sending 90). Using multiple accounts requires multiple phone numbers and logins, but it can keep each individual account under the radar. Important: Each account should only send a humanly plausible number of messages per hour. Sending 100+ DMs in an hour on one account is very likely to get it flagged.
+Randomize and Personalize Messages: To avoid looking like a spam bot, do more than just delay. Vary the message content slightly for each admin. For example, you could prepare a few greeting phrases and pick one at random, include the person's name or channel name in the message, etc. A Python example from a tutorial:
+python
+Copy
+Edit
+messages = [
+    "Hello {}, how are you?",
+    "Hi {}, I came across your channel.",
+    "Hey {}! I have a question about your channel."
+]
+import random
+text = random.choice(messages).format(admin.first_name)
+client.send_message(admin.id, text)
+This way, not every admin gets the exact same text
+python.gotrained.com
+. Telegram’s anti-spam AI looks at patterns; if you send identical messages back-to-back, it’s a red flag. By adding variety and addressing the admin by name, you increase the chance your DM is seen as legitimate.
+Monitor for Errors: Implement logging in your script. Print out when a message is sent, or if it failed (and why). If you start getting a lot of errors like FloodWaitError or PeerFloodError, that's a signal to slow down or stop for the day on that account. Telethon’s exceptions often include details – use them to adapt (for example, if FloodWaitError says wait 3600 seconds, you might decide to stop entirely and resume the next day).
+Be Polite and Concise: This is more of a content tip, but since account safety is also about not being reported: make sure your message to admins is polite, relevant, and not too long. If a bunch of admins report your account for spam, Telegram will quickly impose restrictions. It’s wise to introduce yourself and state your purpose briefly. If you have a link, consider not sending it in the very first message (a blind link in the first message can look spammy; maybe ask if they are interested first).
+Handling Telegram API Limitations and Safety Caveats
+When building this automation, keep in mind a few Telegram API limitations and account safety caveats:
+No Bulk Member Fetch for Broadcast Channels: As noted, if the target is a one-way channel (not a group) and you are not an admin of it, you cannot retrieve its member or admin list via the API
+stackoverflow.com
+. The tool works best for public groups (or channels with linked discussion groups). If you must reach owners of broadcast channels, you may need to find their contact info through other means (some channel profiles list the admin’s username or have a bot for inquiries).
+Bot Accounts vs User Accounts: This solution uses a user account. Using a bot account (with Bot API) wouldn’t let you initiate chats with admins unless they’ve contacted the bot first, nor could it fetch a channel’s admins without being made an admin itself
+community.n8n.io
+. So a personal account is required for cold outreach. However, bots have higher messaging limits in some contexts (since they can message users who have started them without being flagged the same way), but that’s only for responding to users. For initiating contact, a user account is the way.
+Possibility of Account Limitation: Telegram monitors aggressive behavior. If your account gets flagged (via too many PeerFlood errors or user reports), it might be limited. A common outcome is a temporary ban on messaging strangers (you might get a message from Telegram like “Your account was limited for X days due to spam”). During this time, your automation would fail to send DMs (you’d get errors for every attempt). If this happens, you have to wait it out (or appeal via @SpamBot). To avoid this, adhere to the rate limits and best practices mentioned. Test gradually: start with a small batch of messages (e.g. 5 DMs) and see if everything goes smoothly, then slowly increase if needed.
+Use of Third-Party Tools: There are third-party automation platforms (like Integromat/Make, n8n, etc.) that have some Telegram integrations. Be cautious: many of these use the Bot API, which won’t help for our use-case of initiating user chats. Some advanced platforms allow using your own user account through Telethon/Pyrogram under the hood, but essentially they’re doing what we described in this guide. There’s no magic “official” bulk messaging feature – you’re effectively automating a real Telegram client.
+Telegram API Terms: While automating your own account actions is not strictly against Telegram’s terms (many people run userbots for their own productivity), abusing it for spam is forbidden. If your tool crosses the line into spamming, Telegram’s automated systems will act on it. Always ensure you have a valid reason to contact these admins and preferably tailor each message. This will keep your account in good standing.
+Implementation Outline
+Bringing it all together, here’s a high-level outline for implementing the tool:
+Setup and Authentication – Use Telethon or Pyrogram to log in with your personal account credentials (API ID/hash and phone). Securely store session files so you don’t re-login each run. (Refer to the code snippet under Authentication for how to start a client.)
+Input List of Channels – Prepare a list (e.g. a Python list or a file) of the target public channel usernames (channel_usernames = [...]). These should be the part after t.me/, e.g. "channelname" for t.me/channelname.
+Fetch Admins for Each Channel – For each channel in the list:
+Get the channel entity (client.get_entity(username)).
+If it’s a group, ensure you join or have access.
+Retrieve the admins list (client.iter_participants(entity, filter=ChannelParticipantsAdmins) in Telethon
+arabic-telethon.readthedocs.io
+). Store the admin user IDs or User objects.
+(Optional) Filter the list if needed (e.g. skip bots or duplicates). Also consider removing your own account if it appears (not likely unless you are an admin of those channels).
+Message Each Admin – Loop over the admin list and send the message:
+Construct a personalized message for that admin (e.g. include their name).
+Send the message with a delay and error handling:
+Catch UserPrivacyRestrictedError and skip those users who can’t be messaged.
+After each send, sleep for a random short interval (e.g. 15–30 seconds).
+If a FloodWaitError occurs, sleep for the prescribed time
+docs.pyrogram.org
+.
+If a PeerFloodError occurs, log it and stop sending further messages for this session
+python.gotrained.com
+ (you may decide to switch to another account or just terminate).
+Log success or failure for each attempt for auditing.
+Rate Control & Multi-Account Logic – If you have many admins to contact, implement logic to not exceed safe limits:
+For example, you could cap at ~40 messages per hour per account. If the list is larger, either spread it out over more hours or use a second account.
+If using multiple accounts, you might round-robin between them (send 1 message with account A, then 1 with account B, etc., each with its own delay and session). This is advanced, but it can help stay well below the radar for each account.
+Ensure each account has its own client/session and is logged in.
+Error Handling & Retries – Decide how your script handles partial failures. It’s good to retry sending to an admin once or twice if a non-fatal error occurred (sometimes a transient error might happen). But if it’s a privacy error or flood error, retrying won’t help – skip those. You might also implement exponential backoff if you hit flood waits frequently (e.g. wait longer and longer).
+Testing – Run the tool on a small scale first. Perhaps use a test channel where you are an admin to simulate the process. This way, you can verify that fetching admins and sending messages works as expected. Check that messages appear from your personal account in the target’s inbox.
+Below is a simplified code snippet illustrating the core loop with Telethon (for demonstration purposes):
+python
+Copy
+Edit
+from telethon import TelegramClient
+from telethon.tl.types import ChannelParticipantsAdmins
+from telethon.errors import FloodWaitError, PeerFloodError, UserPrivacyRestrictedError
+import time, random
+
+api_id = 123456
+api_hash = 'your_api_hash'
+client = TelegramClient('sess', api_id, api_hash)
+client.start(phone=lambda: input("Phone: "))  # interactive login
+
+channel_usernames = ["examplechannel1", "examplegroup2"]  # list of channels to process
+message_templates = [
+    "Hello {}, I found your channel and ...", 
+    "Hi {}, hope you're doing well. I wanted to reach out about ...",
+]
+for username in channel_usernames:
+    try:
+        entity = client.get_entity(username)
+    except Exception as e:
+        print(f"Could not access {username}: {e}")
+        continue
+    # Iterate over admins in the channel
+    for admin in client.iter_participants(entity, filter=ChannelParticipantsAdmins):
+        if admin.bot or admin.is_self:
+            continue  # skip bots and self
+        # Personalize message
+        msg = random.choice(message_templates).format(admin.first_name or "there")
+        try:
+            client.send_message(admin.id, msg)
+            print(f"Messaged {admin.username or admin.first_name}")
+            time.sleep(random.uniform(15, 30))  # 15-30 sec delay
+        except UserPrivacyRestrictedError:
+            print(f"Skipped {admin.username}: privacy settings do not allow DMs.")
+            continue
+        except FloodWaitError as e:
+            print(f"Hit flood wait. Sleeping for {e.seconds} seconds...")
+            time.sleep(e.seconds)
+            # After sleeping, you might retry the same admin or move on
+            # Here we'll retry once after wait:
+            try:
+                client.send_message(admin.id, msg)
+                print(f"Messaged {admin.username} after wait.")
+            except Exception as e2:
+                print(f"Failed to send to {admin.username} even after wait: {e2}")
+                continue
+        except PeerFloodError:
+            print("PeerFlood error! Stopping to avoid ban.")
+            break  # Break out of admin loop, maybe even break out of channel loop
+(Note: The above code uses Telethon’s synchronous mode for brevity. In an async context, you would await the calls instead. Also, in a real implementation, consider writing to a log file instead of just printing, and structure the code into functions.)
+Conclusion
+Building this tool involves combining Telegram’s unofficial client API with careful rate management. Telethon and Pyrogram are proven libraries to accomplish the task of logging in as a user, extracting channel admin info, and messaging them. The key challenges are not in the coding but in avoiding Telegram’s anti-spam mechanisms. By using the strategies outlined – like slowing down messages, randomizing content, catching errors, and possibly distributing the load across accounts – you can send DMs to channel admins with minimal risk of bans or limits. Always stay within reasonable usage patterns. As one developer succinctly put it regarding Telegram’s limits, many aspects are “strict and unknown… based on normal usage”, so err on the side of caution

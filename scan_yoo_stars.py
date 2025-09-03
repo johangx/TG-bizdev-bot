@@ -119,7 +119,7 @@ async def scan_channel_for_admins(client, username):
                 # Look for t.me links (potential group links)
                 t_me_links = re.findall(r'https://t\.me/(\w+)', message.text)
                 if t_me_links:
-                    print(f"t.me links found: {t_me_links}")
+                    print(f"🔗 t.me links found: {t_me_links}")
                     # Add as potential group links
                     for link in t_me_links:
                         contacts.append(f"https://t.me/{link}")
@@ -127,9 +127,21 @@ async def scan_channel_for_admins(client, username):
                 # Look for invite links
                 invite_links = re.findall(r'https://t\.me/\+(\w+)', message.text)
                 if invite_links:
-                    print(f"Invite links found: {invite_links}")
+                    print(f"🔗 Invite links found: {invite_links}")
                     for link in invite_links:
                         contacts.append(f"https://t.me/+{link}")
+                
+                # Look for community indicators
+                community_keywords = ['community', 'group', 'chat', 'discussion', 'network', 'forum']
+                if any(keyword in message.text.lower() for keyword in community_keywords):
+                    print(f"💬 Community-related content detected!")
+                    
+                # Look for @mentions (potential community handles)
+                mentions = re.findall(r'@(\w+)', message.text)
+                if mentions:
+                    print(f"👥 Mentions found: {mentions}")
+                    for mention in mentions:
+                        contacts.append(f"@{mention}")
                 
                 if message_count >= max_messages:
                     break

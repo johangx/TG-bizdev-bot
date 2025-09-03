@@ -1,3 +1,32 @@
+#!/usr/bin/env python3
+"""
+Telegram Business Development Bot
+
+This bot automates Telegram outreach for business development by:
+1. Identifying channel administrators and owners from Telegram channels
+2. Discovering associated community chats and discussion groups
+3. Extracting contact information from channel descriptions and messages
+4. Sending direct messages to discovered contacts
+5. Exporting all data to Google Sheets for organized tracking
+
+Key Features:
+- Admin Detection: Finds channel admins, owners, and moderators
+- Community Chat Discovery: Identifies linked discussion groups and support channels
+- Smart Contact Mapping: Maps contacts to correct channels with validation
+- Multi-language Support: Can process content in various languages including Russian
+- Google Sheets Integration: Exports data in organized format with proper formatting
+
+Perfect for:
+- Business development teams
+- Marketing agencies
+- Startup founders
+- Content creators
+- Crypto/Web3 projects
+
+Author: Johan
+License: MIT
+"""
+
 import asyncio
 import time
 import random

@@ -1,7 +1,22 @@
 #!/usr/bin/env python3
 """
-Quick Start Script for Telegram Admin Outreach Bot
-This script helps you set up and run the bot for the first time.
+Quick Start Script for Telegram Business Development Bot
+
+This script helps you get started quickly with the bot by:
+1. Checking dependencies
+2. Setting up credentials
+3. Testing basic functionality
+4. Providing usage examples
+
+The bot is designed to help business development teams by:
+- Finding channel administrators and owners
+- Discovering associated community chats and discussion groups
+- Extracting contact information from Telegram channels
+- Automating outreach to discovered contacts
+- Exporting data to Google Sheets for organized tracking
+
+Author: Johan
+License: MIT
 """
 
 import os
@@ -11,21 +26,25 @@ import asyncio
 from pathlib import Path
 
 def print_banner():
-    """Print the welcome banner"""
+    """Print the bot banner"""
     print("=" * 60)
-    print("🚀 Welcome to Telegram Admin Outreach Bot!")
+    print("🚀 TELEGRAM BUSINESS DEVELOPMENT BOT")
     print("=" * 60)
-    print("This script will help you get started with the bot.")
+    print("🤖 Automate your Telegram outreach for business development")
+    print("🔍 Find channel admins and associated community chats")
+    print("📱 Send direct messages to discovered contacts")
+    print("📊 Export data to Google Sheets for organized tracking")
+    print("=" * 60)
     print()
 
 def check_python_version():
     """Check if Python version is compatible"""
-    print("📋 Checking Python version...")
+    print("🐍 Checking Python version...")
     if sys.version_info < (3, 7):
-        print("❌ Python 3.7+ is required. Current version:", sys.version)
-        print("Please upgrade Python and try again.")
+        print("❌ Python 3.7+ is required")
+        print(f"   Current version: {sys.version}")
         return False
-    print(f"✅ Python {sys.version.split()[0]} is compatible!")
+    print(f"✅ Python {sys.version_info.major}.{sys.version_info.minor} detected")
     return True
 
 def install_dependencies():
@@ -33,7 +52,7 @@ def install_dependencies():
     print("\n📦 Installing dependencies...")
     try:
         subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"])
-        print("✅ Dependencies installed successfully!")
+        print("✅ Dependencies installed successfully")
         return True
     except subprocess.CalledProcessError as e:
         print(f"❌ Failed to install dependencies: {e}")
@@ -41,85 +60,87 @@ def install_dependencies():
 
 def check_credentials():
     """Check if credentials are set up"""
-    print("\n🔐 Checking credentials...")
+    print("\n🔑 Checking credentials...")
     
     # Check for .env file
     env_file = Path(".env")
     if env_file.exists():
-        print("✅ .env file found!")
-        return True
-    
-    # Check for environment variables
-    required_vars = ["TELEGRAM_API_ID", "TELEGRAM_API_HASH"]
-    missing_vars = [var for var in required_vars if not os.getenv(var)]
-    
-    if not missing_vars:
-        print("✅ Environment variables are set!")
-        return True
-    
-    print("❌ Missing credentials!")
-    print("Please create a .env file with the following variables:")
-    print("TELEGRAM_API_ID=your_api_id")
-    print("TELEGRAM_API_HASH=your_api_hash")
-    print("\nOr set them as environment variables.")
-    print("\nYou can get these from: https://my.telegram.org/apps")
-    return False
-
-def create_env_file():
-    """Create a .env file template"""
-    print("\n📝 Creating .env file template...")
-    
-    env_content = """# Telegram API Credentials
-# Get these from https://my.telegram.org/apps
-TELEGRAM_API_ID=your_api_id_here
-TELEGRAM_API_HASH=your_api_hash_here
-
-# Bot Token (optional - for bot functionality)
-# Get this from @BotFather on Telegram
-TELEGRAM_BOT_TOKEN=your_bot_token_here
-
-# Google Sheets API (optional)
-# Path to your service account JSON file
-GOOGLE_SHEETS_CREDENTIALS=path/to/service_account.json
-
-# Google Sheets ID (optional)
-# The ID of the spreadsheet you want to update
-GOOGLE_SHEET_ID=your_sheet_id_here
-
-# Rate Limiting (optional)
-# Messages per minute to avoid spam
-MESSAGES_PER_MINUTE=5
-
-# Logging Level (optional)
-# DEBUG, INFO, WARNING, ERROR
-LOG_LEVEL=INFO
-"""
-    
-    try:
-        with open(".env", "w") as f:
-            f.write(env_content)
-        print("✅ .env file created!")
-        print("Please edit it with your actual credentials.")
-        return True
-    except Exception as e:
-        print(f"❌ Failed to create .env file: {e}")
+        print("✅ .env file found")
+        
+        # Load and check environment variables
+        from dotenv import load_dotenv
+        load_dotenv()
+        
+        telegram_api_id = os.getenv('TELEGRAM_API_ID')
+        telegram_api_hash = os.getenv('TELEGRAM_API_HASH')
+        
+        if telegram_api_id and telegram_api_hash:
+            print("✅ Telegram API credentials found")
+        else:
+            print("❌ Telegram API credentials missing from .env file")
+            print("   Please add TELEGRAM_API_ID and TELEGRAM_API_HASH")
+            return False
+    else:
+        print("❌ .env file not found")
+        print("   Please create .env file with your credentials")
         return False
+    
+    # Check for Google Sheets credentials
+    service_account_file = Path("service_account.json")
+    if service_account_file.exists():
+        print("✅ Google Sheets service account file found")
+    else:
+        print("⚠️  Google Sheets service account file not found")
+        print("   You can still use the bot without Google Sheets integration")
+    
+    return True
 
-def run_test_scan():
-    """Run a test scan to verify everything works"""
-    print("\n🧪 Running test scan...")
-    try:
-        # Import and run the scan function
-        from scan_yoo_stars import main
-        print("✅ Test scan completed successfully!")
-        return True
-    except Exception as e:
-        print(f"❌ Test scan failed: {e}")
-        print("This might be due to missing credentials or network issues.")
-        return False
+def show_usage_examples():
+    """Show usage examples"""
+    print("\n📖 USAGE EXAMPLES")
+    print("=" * 40)
+    
+    print("\n🔍 Scan channels for admins and community chats:")
+    print("   python telegram_admin_dm_bot.py")
+    
+    print("\n💬 Find community chats for specific channels:")
+    print("   python community_chat_finder.py")
+    
+    print("\n📱 Send messages to users:")
+    print("   python send_gm_message_to_users.py")
+    
+    print("\n📊 Update Google Sheets:")
+    print("   python sheets_update_final.py")
+    
+    print("\n🔍 Scan specific channels:")
+    print("   python scan_yoo_stars.py")
+
+def show_capabilities():
+    """Show bot capabilities"""
+    print("\n🚀 BOT CAPABILITIES")
+    print("=" * 40)
+    
+    capabilities = [
+        "🔍 Admin Detection - Find channel administrators and owners",
+        "💬 Community Chat Discovery - Identify linked discussion groups",
+        "📱 Direct Messaging - Send personalized outreach messages",
+        "📊 Google Sheets Integration - Export data in organized format",
+        "🌐 Multi-language Support - Process content in various languages",
+        "⚡ Smart Contact Mapping - Map contacts to correct channels",
+        "🔄 Rate Limit Handling - Built-in delays for API compliance"
+    ]
+    
+    for capability in capabilities:
+        print(f"   {capability}")
+    
+    print("\n🎯 Perfect for business development teams who need to:")
+    print("   • Find decision-makers in target industries")
+    print("   • Discover community engagement opportunities")
+    print("   • Map out the full ecosystem around channels")
+    print("   • Identify multiple contact points for outreach")
 
 def main():
-    """Main setup function"""
+    """Main function"""
     print_banner()
     
     # Check Python version
@@ -132,23 +153,23 @@ def main():
     
     # Check credentials
     if not check_credentials():
-        print("\nWould you like me to create a .env file template? (y/n): ", end="")
-        if input().lower().startswith('y'):
-            create_env_file()
-        print("\nPlease set up your credentials and run this script again.")
+        print("\n📝 SETUP INSTRUCTIONS:")
+        print("1. Create a .env file with your Telegram API credentials")
+        print("2. Get API credentials from https://my.telegram.org/")
+        print("3. For Google Sheets integration, add service_account.json")
+        print("4. Run this script again")
         return
     
-    # Run test scan
-    print("\n🎯 Everything is set up! Running a test scan...")
-    if run_test_scan():
-        print("\n🎉 Setup complete! Your bot is ready to use.")
-        print("\nNext steps:")
-        print("1. Edit .env file with your credentials")
-        print("2. Run: python telegram_admin_dm_bot.py")
-        print("3. Or run: python scan_yoo_stars.py")
-    else:
-        print("\n⚠️  Setup completed with warnings.")
-        print("Please check your credentials and try again.")
+    print("\n🎉 SETUP COMPLETE!")
+    print("Your bot is ready to use!")
+    
+    # Show capabilities and usage
+    show_capabilities()
+    show_usage_examples()
+    
+    print("\n" + "=" * 60)
+    print("🚀 Ready to automate your Telegram business development!")
+    print("=" * 60)
 
 if __name__ == "__main__":
     main()
